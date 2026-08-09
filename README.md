@@ -1,304 +1,233 @@
-# Halyk AI Challenge Agent
+# Halyk AI Challenge 2026 — Autonomous Covenant Compliance Agent
 
-> **Production-ready agent system for the Halyk AI Challenge** — Document intelligence, temporal reasoning, financial calculation, and audit-grade proof generation.
+> AI-агент для автоматической проверки соблюдения кредитных ковенантов на основе PDF-договоров и транзакционных данных.
 
-## 🏗️ Architecture Overview
+## 🏗️ Как это работает
+
+Агент получает на вход набор PDF-документов (кредитные договоры, дополнения, KYC, аудиторские заключения) и реестр транзакций (`master_ledger_2025.csv`). Для каждого заёмщика он:
+
+1. **Маппит документы на сценарии** — сканирует PDF через PyMuPDF, находит `ACC-XXXX` и привязывает документы к заёмщикам.
+2. **Извлекает метаданные** — определяет тип документа (CONTRACT / AMENDMENT / KYC / AUDIT), даты действия, и отфильтровывает устаревшие версии.
+3. **Парсит ковенанты через LLM** — отправляет релевантные фрагменты договора в нейросеть, которая возвращает структурированное определение: описание, лимит, тип (MAX / MIN / RATIO), категории транзакций.
+4. **Классифицирует транзакции** — двухуровневая система: сначала эвристический фильтр по ключевым словам, затем LLM-батч-классификация для точного отбора.
+5. **Вычисляет метрики** — суммирует подходящие транзакции, применяет обменные курсы, вычисляет коэффициенты (RATIO).
+6. **Выносит вердикт** — сравнивает фактическое значение с лимитом и определяет `COMPLIANT` или `BREACH`, указывая конкретную транзакцию-нарушителя.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         HALYK AGENT PIPELINE                                │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐             │
-│  │ INGEST   │───▶│ RETRIEVE │───▶│ RESOLVE  │───▶│ CALCULATE│             │
-│  │          │    │          │    │          │    │          │             │
-│  │ marker-  │    │ bge-m3   │    │ KuzuDB   │    │ numexpr  │             │
-│  │ pdf +    │    │ dense +  │    │ Entity   │    │ + Z3     │             │
-│  │ docling  │    │ sparse + │    │ Resolution│   │ Constraints│            │
-│  │ Tables+  │    │ colbert  │    │ Bi-temp  │    │ Proof    │             │
-│  │ BBox     │    │ + BM25   │    │ Graph    │    │          │             │
-│  └──────────┘    └──────────┘    └──────────┘    └──────────┘             │
-│       │                                        │                           │
-│       ▼                                        ▼                           │
-│  ┌──────────────────────────────────────────────────────────┐             │
-│  │              VERIFIER (Z3 SMT Solver)                    │             │
-│  │  • max_commission_rate  • min_reserve_ratio              │             │
-│  │  • max_loan_to_value    • interest_rate_cap              │             │
-│  │  • kyc_required         • aml_threshold                  │             │
-│  │  • transaction_limit    • currency_control               │             │
-│  └──────────────────────────────────────────────────────────┘             │
-│       │                                        │                           │
-│       ▼                                        ▼                           │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐             │
-│  │ SYNTHESIZE│◀──│ VALIDATE │◀──│ COUNTER- │◀──│  VOTING  │             │
-│  │          │    │          │    │ FACTUAL  │    │ (N=5)    │             │
-│  │ Proof    │    │ Evidence │    │ Remove   │    │ Majority │             │
-│  │ Bundles  │    │ Check    │    │ Docs/Txn │    │ Consensus│             │
-│  └──────────┘    └──────────┘    └──────────┘    └──────────┘             │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                     HALYK AGENT PIPELINE                          │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐       │
+│  │ MAP DOCS │──▶│ PARSE    │──▶│ EXTRACT  │──▶│ CLASSIFY │       │
+│  │          │   │ METADATA │   │ COVENANTS│   │   TXNS   │       │
+│  │ PyMuPDF  │   │ LLM +    │   │ LLM +    │   │ Heuristic│       │
+│  │ ACC-XXXX │   │ Temporal │   │ Pydantic │   │ + LLM    │       │
+│  │ matching │   │ Filtering│   │ Schema   │   │ Batch    │       │
+│  └──────────┘   └──────────┘   └──────────┘   └──────────┘       │
+│       │                                             │              │
+│       ▼                                             ▼              │
+│  ┌─────────────────────────────────────────────────────────┐      │
+│  │              CALCULATE & DECIDE                         │      │
+│  │  • Sum matched transactions (with currency conversion)  │      │
+│  │  • Compute ratios (numerator / denominator)             │      │
+│  │  • Compare actual vs limit → COMPLIANT / BREACH         │      │
+│  │  • Identify evidence transaction for breaches           │      │
+│  └─────────────────────────────────────────────────────────┘      │
+│       │                                                            │
+│       ▼                                                            │
+│  ┌──────────┐                                                      │
+│  │ OUTPUT   │  submission.json                                     │
+│  │          │  (status, actual, evidence_txn_id per covenant)      │
+│  └──────────┘                                                      │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
-## ✨ Key Features
+## ✨ Ключевые особенности
 
-| Feature | Technology | Why It Wins |
-|---------|------------|-------------|
-| **PDF Parsing** | `marker-pdf` + `docling` | SOTA table extraction with pixel-perfect bbox |
-| **Embeddings** | `bge-m3` (dense+sparse+colbert) | Multilingual (kz/ru/en), hybrid search native |
-| **Retrieval** | Qdrant + BM25 + Temporal filtering | Self-query by document validity period |
-| **Entity Resolution** | KuzuDB + RapidFuzz + LLM verification | Bi-temporal graph (doc time + txn time) |
-| **Calculation** | `numexpr` + `simpleeval` | Safe, fast, auditable math |
-| **Business Rules** | Z3 SMT Solver | **Proves** compliance, doesn't just check |
-| **Self-Consistency** | N=5 voting | Reduces hallucination, measures agreement |
-| **Counterfactual** | Remove docs/txns, re-evaluate | Quantifies evidence criticality |
-| **Proof Bundles** | Page + bbox + method citations | Audit-ready, judge-friendly output |
+| Компонент | Технология | Описание |
+|-----------|-----------|----------|
+| **PDF-парсинг** | `PyMuPDF (fitz)` | Быстрое извлечение текста из PDF; автоматический фоллбэк на OCR при нечитаемых документах |
+| **OCR** | `EasyOCR` (ru + en) | Распознавание отсканированных документов на русском и английском языках |
+| **LLM** | `OpenRouter` (DeepSeek V4 Flash) | Извлечение ковенантов и классификация транзакций через облачную нейросеть |
+| **Структурированный вывод** | `Pydantic` + `LangChain` | Гарантированный JSON-ответ от LLM через `with_structured_output()` |
+| **Отказоустойчивость** | `tenacity` | Автоматические ретраи с экспоненциальной задержкой (до 10 попыток) |
+| **Ротация ключей** | Встроенная | Поддержка нескольких API-ключей с автоматическим переключением при ошибках |
+| **Кэширование** | JSON-кэш | Кэширование метаданных документов и определений ковенантов между запусками |
+| **Параллелизация** | `ThreadPoolExecutor` | До 12 заёмщиков обрабатываются одновременно |
+| **Возобновление** | `debug_runs/` | При перезапуске скрипт пропускает уже обработанных заёмщиков |
+| **KYC / Аффилированные лица** | `KuzuDB` | Граф связанных лиц для проверки ковенантов по related party |
 
-## 🚀 Quick Start
+## 🚀 Быстрый старт
 
-### Prerequisites
-- Python 3.11+
-- Docker (recommended) or local CUDA for embeddings
-- 16GB+ RAM, 8GB+ VRAM for bge-m3
+### Требования
 
-### Option 1: Docker (Recommended)
+- **Python 3.11+**
+- **Windows / Linux / macOS**
+- **API-ключ OpenRouter** (зарегистрируйтесь на [openrouter.ai](https://openrouter.ai))
+
+### Установка
 
 ```bash
-# Build
-docker build -t halyk-agent .
+# 1. Клонируйте репозиторий
+git clone https://github.com/nisslow/halyk-agent.git
+cd halyk-agent
 
-# Run ingestion
-docker run --rm -v $(pwd)/data:/app/data halyk-agent \
-  ingest --input-dir /app/data/raw --output-dir /app/data/processed
+# 2. Создайте виртуальное окружение
+python -m venv .venv
 
-# Run agent
-docker run --rm -v $(pwd)/data:/app/data halyk-agent \
-  run --query "Should transaction TXN_123 be approved?" \
-      --case-id CASE_001 \
-      --transaction-date 2024-01-15 \
-      --output /app/data/submission.json
-```
-
-### Option 2: Local Development
-
-```bash
-# Create venv
-python3.11 -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# Linux/macOS:
 source .venv/bin/activate
 
-# Install
-pip install -e ".[dev]"
+# 3. Установите зависимости
+pip install -r requirements.txt
 
-# Download models (first run)
-python -c "from flag_embedding import FlagModel; FlagModel('BAAI/bge-m3')"
-
-# Run ingestion
-python -m halyk_agent.main ingest \
-  --input-dir data/raw \
-  --output-dir data/processed \
-  --transactions data/transactions.csv
-
-# Run agent
-python -m halyk_agent.main run \
-  --query "Should transaction TXN_123 be approved?" \
-  --case-id CASE_001 \
-  --transaction-date 2024-01-15 \
-  --votes 5 \
-  --output submission.json
+# 4. Установите сам пакет
+pip install -e .
 ```
 
-## 📁 Project Structure
+### Настройка
+
+Отредактируйте файл `run_agent.bat` (Windows) и укажите:
+
+```bat
+REM Путь к папке с датасетом
+set DATASET_DIR=E:\path\to\agentic-bank-hidden
+
+REM Ваш API-ключ OpenRouter
+set OPENROUTER_API_KEY=sk-or-v1-your-key-here
+
+REM Модель (по умолчанию DeepSeek V4 Flash — лучшая по соотношению цена/качество)
+set LLM_MODEL=deepseek/deepseek-v4-flash-0731
+
+REM Количество параллельных потоков (по умолчанию 12)
+set MAX_WORKERS=12
+```
+
+### Запуск
+
+```bash
+# Windows — просто двойной клик:
+run_agent.bat
+
+# Или вручную из терминала:
+python scripts/map_documents.py
+python scripts/run_hackathon_agent.py
+```
+
+Скрипт выполнит два этапа:
+1. `map_documents.py` — сканирует все PDF и создаёт маппинг документов на заёмщиков.
+2. `run_hackathon_agent.py` — запускает основной пайплайн анализа ковенантов.
+
+Результат сохраняется в файл **`submission.json`** в корне проекта.
+
+### Использование локальной LLM (опционально)
+
+Если у вас есть локальная модель через LM Studio или Ollama:
+
+```bat
+set LLM_PROVIDER=local
+set LLM_MODEL=your-local-model-name
+set LOCAL_BASE_URL=http://localhost:1234/v1
+```
+
+## 📁 Структура проекта
 
 ```
 halyk-agent/
-├── config/
-│   └── settings.yaml          # All configuration
-├── data/
-│   ├── raw/                   # Input PDFs, transaction CSV
-│   └── processed/             # Parsed chunks, tables, embeddings
 ├── scripts/
-│   └── run_pipeline.py        # End-to-end orchestration
+│   ├── map_documents.py              # Маппинг PDF → сценарий (по ACC-XXXX)
+│   └── run_hackathon_agent.py         # Основной пайплайн (900 строк)
 ├── src/halyk_agent/
-│   ├── config/                # Settings management
-│   ├── models/                # Pydantic data models
-│   ├── ingestion/             # PDF + transaction parsing
-│   ├── retrieval/             # Hybrid search (bge-m3 + BM25)
-│   ├── graph/                 # KuzuDB entity resolution
-│   ├── agents/                # LangGraph pipeline
-│   ├── validation/            # Z3 constraints + calc engine
-│   ├── proof/                 # Voting + counterfactual + bundles
-│   ├── eval/                  # Evaluation harness
-│   └── main.py                # CLI entry point
-├── tests/
-│   ├── test_ingestion.py
-│   ├── test_retrieval.py
-│   ├── test_graph.py
-│   ├── test_validation.py
-│   └── eval_harness.py
-├── Dockerfile
-├── pyproject.toml
+│   ├── eval/
+│   │   └── harness.py                 # Оценка submission vs ground_truth
+│   ├── graph/
+│   │   ├── kyc_graph.py               # KuzuDB граф аффилированных лиц
+│   │   └── entity_resolution.py       # Разрешение сущностей (RapidFuzz)
+│   ├── ingestion/
+│   │   ├── pdf_pipeline.py            # PDF-парсинг (PyMuPDF + OCR)
+│   │   ├── transaction_loader.py      # Загрузка транзакций из CSV
+│   │   └── llm_extractor.py           # LLM-экстракция из документов
+│   ├── retrieval/
+│   │   └── hybrid_retriever.py        # Гибридный поиск (BM25 + embeddings)
+│   ├── utils/
+│   │   ├── llm_factory.py             # Фабрика LLM (OpenRouter / Local)
+│   │   └── ocr_engine.py              # EasyOCR движок (ru + en)
+│   ├── validation/
+│   │   └── z3_validator.py            # Z3 SMT валидатор бизнес-правил
+│   ├── proof/
+│   │   └── consistency.py             # Проверка консистентности
+│   └── main.py                        # CLI точка входа
+├── run_agent.bat                      # Точка запуска (Windows)
+├── .env.example                       # Шаблон переменных окружения
+├── requirements.txt                   # Python-зависимости
+├── pyproject.toml                     # Конфигурация пакета
+├── Dockerfile                         # Docker-образ
 └── README.md
 ```
 
-## 🔧 Configuration
-
-All settings in `config/settings.yaml` (override via environment variables):
-
-```yaml
-llm:
-  provider: "openai"
-  model: "gpt-4o"
-  temperature: 0.1
-
-embedding:
-  model: "BAAI/bge-m3"
-  device: "cuda"
-  use_dense: true
-  use_sparse: true
-  use_colbert: true
-
-vector_db:
-  dense_weight: 0.5
-  sparse_weight: 0.3
-  colbert_weight: 0.2
-
-retrieval:
-  top_k: 20
-  consistency_votes: 5
-  counterfactual_samples: 3
-
-validation:
-  consistency_threshold: 0.7
-  counterfactual_threshold: 0.15
-```
-
-## 📊 CLI Commands
-
-```bash
-# Ingest documents
-halyk-agent ingest --input-dir data/raw --output-dir data/processed --transactions data/txns.csv
-
-# Test retrieval
-halyk-agent retrieve --query "комиссия 2023" --top-k 10
-
-# Run full pipeline with voting
-halyk-agent run --query "Should TXN_123 be approved?" \
-    --case-id CASE_001 \
-    --transaction-date 2024-01-15 \
-    --votes 5 \
-    --output submission.json
-
-# Run evaluation
-halyk-agent eval --test-cases data/test.json --golden data/golden.json --output-dir results/
-```
-
-## 📋 Output: submission.json
+## 📋 Формат выходного файла (submission.json)
 
 ```json
 {
-  "submissions": [
-    {
-      "case_id": "CASE_001",
-      "decision": "APPROVE",
-      "confidence": 0.91,
-      "reasoning": "Step 1: Retrieved 15 relevant chunks...\nStep 2: Resolved 8 entities...\nStep 3: Calculated commission = 45,000 KZT...\nStep 4: Business rule verification PASSED",
-      "evidence": [
-        {
-          "source": "doc_abc123",
-          "type": "table",
-          "page": 4,
-          "bbox": {"x0": 120, "y0": 450, "x1": 300, "y1": 480, "page": 4},
-          "claim": "Commission rate: 1.5%",
-          "confidence": 0.95
-        }
-      ]
+  "team": "Название команды",
+  "contact_email": "email@example.com",
+  "model": "deepseek/deepseek-v4-flash-0731",
+  "answers": {
+    "S1": {
+      "6.1": {
+        "status": "COMPLIANT",
+        "actual": 0.041,
+        "evidence_txn_id": null
+      },
+      "6.2": {
+        "status": "BREACH",
+        "actual": 2623107.95,
+        "evidence_txn_id": "TXN-S1-0054"
+      }
     }
-  ],
-  "metadata": {
-    "generated_at": "2024-01-15T10:30:00Z",
-    "total_cases": 1
   }
 }
 ```
 
-## 🧪 Evaluation Metrics
+Каждый ковенант содержит:
+- **`status`** — `"COMPLIANT"` (соблюдён) или `"BREACH"` (нарушен)
+- **`actual`** — фактическое числовое значение метрики
+- **`evidence_txn_id`** — ID транзакции-нарушителя (или `null` при соблюдении)
 
-| Metric | Target | Description |
-|--------|--------|-------------|
-| Accuracy | > 0.90 | Decision correctness |
-| Citation Quality | > 0.85 | Every claim has page+bbox+method |
-| Counterfactual Robustness | > 0.80 | Decision stable under evidence removal |
-| Schema Valid | 100% | Matches Submission.json exactly |
+## 🔧 Переменные окружения
 
-## 🔬 Advanced Usage
+| Переменная | По умолчанию | Описание |
+|-----------|-------------|----------|
+| `DATASET_DIR` | `./agentic-bank-public` | Путь к папке с датасетом |
+| `LLM_PROVIDER` | `openrouter` | Провайдер LLM (`openrouter` или `local`) |
+| `LLM_MODEL` | `deepseek/deepseek-v4-flash-0731` | Название модели |
+| `OPENROUTER_API_KEY` | — | API-ключ OpenRouter |
+| `MAX_WORKERS` | `12` | Количество параллельных потоков |
+| `SCENARIO_FILTER` | — | Фильтр сценариев (например, `S1,S2,B3`) |
+| `LOCAL_BASE_URL` | `http://localhost:1234/v1` | URL локальной модели |
 
-### Custom Business Rules (Z3)
+## 🧪 Оценка результатов
 
-```python
-from halyk_agent.validation import Z3Validator
+Если в папке датасета есть файл `ground_truth.json`, скрипт автоматически запустит оценку:
 
-validator = Z3Validator()
-# Add custom rule
-def custom_rule(calc):
-    s = Solver()
-    s.add(Real("my_metric") <= 100)
-    return validator._check_solver(s, "custom", {"my_metric": Real("my_metric")})
-
-validator.rules["custom_rule"] = custom_rule
+```bash
+# Или вручную:
+python src/halyk_agent/eval/harness.py ground_truth.json submission.json
 ```
 
-### Extend Entity Types
+Система оценки (на каждый ковенант — макс 1.0 балл):
+- **0.50** — правильный статус (COMPLIANT / BREACH)
+- **0.30** — точность числового значения (actual) с допуском 5%
+- **0.20** — правильная идентификация транзакции-нарушителя
 
-```python
-# In config/settings.yaml
-graph_db:
-  entity_types:
-    - "Organization"
-    - "Person"
-    - "Contract"
-    - "Transaction"
-    - "Document"
-    - "Regulation"
-    - "Counterparty"      # NEW
-    - "BeneficialOwner"   # NEW
-```
+## 📝 Лицензия
 
-### Custom Retrieval Weights
-
-```python
-retriever = HybridRetriever()
-# Override fusion weights
-results = retriever.retrieve(query, top_k=10)
-# Results include dense_score, sparse_score, colbert_score, bm25_score
-```
-
-## 📈 Performance Optimization
-
-- **Embeddings**: Cache bge-m3 embeddings in Qdrant (persistent)
-- **Graph**: KuzuDB is embedded, zero-latency for local queries
-- **Voting**: Run N votes in parallel (ThreadPoolExecutor)
-- **Token Usage**: Use `instructor` for structured output, reduce retries
-
-## 🐛 Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| `marker-pdf` import error | `pip install marker-pdf[full]` |
-| `docling` OCR fails | Install `tesseract-ocr-kaz` system package |
-| CUDA OOM | Reduce `embedding.batch_size` to 8 |
-| Qdrant connection refused | `docker run -d -p 6333:6333 qdrant/qdrant` |
-| Z3 timeout | Increase `validation.z3_timeout_ms` |
-
-## 📝 License
-
-MIT License - See LICENSE file for details.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch
-3. Run tests: `pytest tests/ -v`
-4. Submit PR with description of changes
+MIT License
 
 ---
 
-**Built for Halyk AI Challenge 2024** — *Winning through audit-grade reasoning, not just accuracy.*
+**Built for Halyk AI Challenge 2026** 🏆
