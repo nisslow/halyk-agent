@@ -1,0 +1,37 @@
+# Datasets and Documents
+agentic-bank-*/
+agentic-bank-public/
+agentic-bank-hidden/
+data/
+
+# Databases
+kuzu_kyc_db_*
+*.wal
+*.lock
+src/data/kuzu_db/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+env/
+.env
+
+# Logs and Debug
+log_*.txt
+prompt_debug.txt
+debug_runs/
+scratch/
+
+# IDE
+.vscode/
+.idea/
+
+# Agent Artifacts
+p1_*.txt
+p1_*.csv
+
+# Prevent committing API keys
+.env
+

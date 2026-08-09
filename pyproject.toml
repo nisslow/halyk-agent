@@ -1,0 +1,81 @@
+[project]
+name = "halyk-agent"
+version = "0.1.0"
+description = "Halyk AI Challenge Agent System - Document Intelligence + Financial Reasoning"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # Core orchestration
+    "langgraph>=0.2.0",
+    "langchain-core>=0.3.0",
+    "langchain-community>=0.3.0",
+    
+    # PDF parsing - marker-pdf (VikParuchuri) + docling (IBM)
+    "marker-pdf>=0.1.0",
+    "docling>=2.0.0",
+    
+    # Embeddings - bge-m3 (dense + sparse + colbert)
+    # FlagEmbedding installed from GitHub: pip install git+https://github.com/FlagOpen/FlagEmbedding.git
+    "sentence-transformers>=3.0.0",
+    
+    # Vector DB
+    "qdrant-client>=1.10.0",
+    
+    # Graph DB
+    "kuzu>=0.5.0",
+    
+    # Constraint solving
+    "z3-solver>=4.12.0",
+    
+    # Calculation
+    "numexpr>=2.10.0",
+    "simpleeval>=0.9.0",
+    
+    # LLM
+    "openai>=1.30.0",
+    "instructor>=1.5.0",
+    
+    # Data processing
+    "pandas>=2.2.0",
+    "polars>=1.0.0",
+    "numpy>=1.26.0",
+    
+    # Utils
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    "pyyaml>=6.0.0",
+    "tqdm>=4.66.0",
+    "loguru>=0.7.0",
+    "tenacity>=8.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.5.0",
+    "mypy>=1.10.0",
+    "pre-commit>=3.7.0",
+]
+
+[build-system]
+requires = ["setuptools>=69.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I", "UP", "W", "C90", "ANN", "ARG", "B", "COM", "DTZ", "EXE", "FA", "FUR", "ISC", "ICN", "PIE", "PT", "Q", "RET", "SIM", "T10", "T20", "TCH", "TRY", "UP", "YTT"]
+ignore = ["ANN101", "ANN102", "ARG001", "ARG002", "TRY003"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

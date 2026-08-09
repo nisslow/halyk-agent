@@ -1,0 +1,160 @@
+# Halyk Agent Configuration
+# All settings via environment variables with defaults
+
+app:
+  name: "halyk-agent"
+  version: "0.1.0"
+  debug: false
+  log_level: "INFO"
+
+# LLM Configuration
+llm:
+  provider: "openai"  # openai, vllm, ollama
+  model: "gpt-4o"  # or qwen2.5-72b, nemotron-3-70b
+  base_url: null  # for vllm/ollama
+  api_key: "${OPENAI_API_KEY}"
+  temperature: 0.1
+  max_tokens: 8192
+  timeout: 120
+  max_retries: 3
+
+# Embedding Configuration (bge-m3)
+embedding:
+  model: "BAAI/bge-m3"
+  device: "cuda"  # cuda, mps, cpu
+  batch_size: 32
+  max_length: 8192
+  # bge-m3 supports dense, sparse, colbert
+  use_dense: true
+  use_sparse: true
+  use_colbert: true
+
+# PDF Parsing
+pdf_parsing:
+  # marker-pdf settings
+  marker:
+    use_llm: false  # set true for better quality (needs LLM)
+    output_format: "markdown"
+    extract_tables: true
+    extract_images: false
+    languages: ["kz", "ru", "en"]
+  # docling settings
+  docling:
+    extract_tables: true
+    extract_figures: false
+    ocr_engine: "easyocr"  # easyocr, tesseract
+    languages: ["kz", "ru", "en"]
+
+# Vector Database (Qdrant)
+vector_db:
+  host: "localhost"
+  port: 6333
+  grpc_port: 6334
+  collection_name: "halyk_documents"
+  vector_size: 1024  # bge-m3 dense dim
+  distance: "Cosine"
+  # Hybrid search weights
+  dense_weight: 0.5
+  sparse_weight: 0.3
+  colbert_weight: 0.2
+  # Temporal filtering
+  enable_temporal_filter: true
+
+# Graph Database (KuzuDB)
+graph_db:
+  path: "./data/kuzu_db"
+  # Entity types
+  entity_types:
+    - "Organization"
+    - "Person"
+    - "Contract"
+    - "Transaction"
+    - "Document"
+    - "Regulation"
+  # Relation types
+  relation_types:
+    - "APPEARS_IN"
+    - "HAS_TXN"
+    - "SUPERSEDES"
+    - "AMENDS"
+    - "APPENDIX_OF"
+    - "ISSUED_BY"
+    - "GOVERNS"
+
+# Ingestion Pipeline
+ingestion:
+  chunk_size: 1000
+  chunk_overlap: 200
+  # Table extraction settings
+  table_extraction:
+    min_rows: 2
+    min_cols: 2
+    header_detection: true
+    bbox_inclusion: true
+  # Metadata extraction
+  metadata_extraction:
+    use_llm: true
+    extract_dates: true
+    extract_entities: true
+    extract_keywords: true
+
+# Retrieval
+retrieval:
+  top_k: 20
+  # Self-consistency
+  consistency_votes: 5
+  # Counterfactual
+  counterfactual_samples: 3
+  # Temporal filtering
+  temporal_filter:
+    enabled: true
+    transaction_date_field: "transaction_date"
+    doc_valid_from_field: "valid_from"
+    doc_valid_to_field: "valid_to"
+
+# Validation
+validation:
+  # Z3 constraint checking
+  z3_timeout_ms: 5000
+  # Self-consistency threshold
+  consistency_threshold: 0.7
+  # Counterfactual significance
+  counterfactual_threshold: 0.15
+  # Evidence requirements
+  min_citations_per_claim: 1
+  max_citations_per_claim: 5
+
+# Agent Pipeline
+pipeline:
+  max_iterations: 3
+  max_retries_per_node: 2
+  # Node timeouts (seconds)
+  node_timeouts:
+    planner: 30
+    retriever: 60
+    resolver: 30
+    calculator: 30
+    verifier: 30
+    synthesizer: 30
+    validator: 30
+
+# Output
+output:
+  proof_bundle_format: "json"
+  include_bbox: true
+  include_extraction_method: true
+  include_confidence: true
+  submission_file: "submission.json"
+
+# Evaluation
+eval:
+  harness_path: "./tests/eval_harness.py"
+  test_dataset: "./data/test/"
+  golden_file: "./data/golden.json"
+  metrics:
+    - "accuracy"
+    - "precision"
+    - "recall"
+    - "f1"
+    - "citation_quality"
+    - "counterfactual_robustness"

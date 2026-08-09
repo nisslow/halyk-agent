@@ -1,0 +1,54 @@
+# Halyk Agent - Python Dependencies
+# Generated from pyproject.toml
+
+# Core orchestration
+langgraph>=0.2.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+
+# PDF parsing - marker-pdf (VikParuchuri) + docling (IBM)
+marker-pdf>=0.1.0
+docling>=2.0.0
+
+# Embeddings - bge-m3 (dense + sparse + colbert)
+# FlagEmbedding installed from GitHub
+sentence-transformers>=3.0.0
+
+# Vector DB
+qdrant-client>=1.10.0
+
+# Graph DB
+kuzu>=0.5.0
+
+# Constraint solving
+z3-solver>=4.12.0
+
+# Calculation
+numexpr>=2.10.0
+simpleeval>=0.9.0
+
+# LLM
+openai>=1.30.0
+instructor>=1.5.0
+
+# Data processing
+pandas>=2.2.0
+polars>=1.0.0
+numpy>=1.26.0
+
+# Utils
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+pyyaml>=6.0.0
+tqdm>=4.66.0
+loguru>=0.7.0
+tenacity>=8.2.0
+
+# Fuzzy matching
+rapidfuzz>=3.9.0
+
+# BM25
+rank-bm25>=0.2.2
+
+# PyMuPDF for metadata
+pymupdf>=1.23.0
