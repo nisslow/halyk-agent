@@ -44,6 +44,15 @@
 └────────────────────────────────────────────────────────────────────┘
 ```
 
+> **Важно:** В репозитории реализовано **два режима работы**:
+>
+> | Режим | Точка входа | Retrieval | Инфраструктура |
+> |-------|-------------|-----------|----------------|
+> | **Полный Hybrid RAG** (production) | `scripts/run_pipeline.py` / `halyk_agent.main` | bge-m3 (dense+sparse+colbert) + BM25 + Qdrant + temporal filtering | Qdrant, GPU для эмбеддингов, предварительная ингистация |
+> | **Хакатон LLM-only** (быстро, без инфраструктуры) | `run_agent.bat` → `scripts/run_hackathon_agent.py` | Прямой текст PDF → контекст LLM (PyMuPDF) | Только Python + API OpenRouter/LM Studio |
+>
+> `run_agent.bat`, используемый для сабмишн в челлендже, запускает **LLM-only режим** для скорости и нулевой инфраструктуры. Полный Hybrid RAG пайплайн реализован в `src/halyk_agent/retrieval/hybrid_retriever.py` и оркестрируется через `scripts/run_pipeline.py`.
+
 ## ✨ Ключевые особенности
 
 | Компонент | Технология | Описание |
