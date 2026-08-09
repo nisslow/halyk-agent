@@ -52,6 +52,8 @@
 > | **Хакатон LLM-only** (быстро, без инфраструктуры) | `run_agent.bat` → `scripts/run_hackathon_agent.py` | Прямой текст PDF → контекст LLM (PyMuPDF) | Только Python + API OpenRouter/LM Studio |
 >
 > `run_agent.bat`, используемый для сабмишн в челлендже, запускает **LLM-only режим** для скорости и нулевой инфраструктуры. Полный Hybrid RAG пайплайн реализован в `src/halyk_agent/retrieval/hybrid_retriever.py` и оркестрируется через `scripts/run_pipeline.py`.
+>
+> **Тестирование:** Разработка и отладка велась локально в режиме **Хакатон LLM-only** (бесплатные/дешёвые модели через OpenRouter/LM Studio). **Финальный прогон сабмишн** выполнялся на платной модели (DeepSeek V4 Flash / Nemotron 3 Ultra) для максимального качества.
 
 ## ✨ Ключевые особенности
 
