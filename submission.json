@@ -1,7 +1,7 @@
 {
   "team": "MENSUS",
   "contact_email": "https://t.me/Nislavlev",
-  "model": "",
+  "model": "deepseek/deepseek-v4-flash-0731",
   "answers": {
     "F2": {
       "6.1": {
